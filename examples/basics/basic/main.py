@@ -1,5 +1,6 @@
 import blenderproc as bproc
 import argparse
+import numpy as np
 
 parser = argparse.ArgumentParser()
 parser.add_argument('camera', help="Path to the camera file, should be examples/resources/camera_positions")
@@ -21,13 +22,28 @@ light.set_energy(1000)
 # define the camera resolution
 bproc.camera.set_resolution(512, 512)
 
+K = np.array([
+    [1000, 0, 125],
+    [0, 1000, 250],
+    [0, 0, 1]
+])
+bproc.camera.set_intrinsics_from_K_matrix(K, 512, 512)
+
+
+poses_output = []
 # read the camera positions file and convert into homogeneous camera-world transformation
 with open(args.camera, "r") as f:
     for line in f.readlines():
         line = [float(x) for x in line.split()]
         position, euler_rotation = line[:3], line[3:6]
         matrix_world = bproc.math.build_transformation_mat(position, euler_rotation)
+        # OpenCV -> OpenGL
         bproc.camera.add_camera_pose(matrix_world)
+        matrix_world = bproc.math.change_source_coordinate_frame_of_transformation_matrix(matrix_world, ["X", "-Y", "-Z"])
+        poses_output.append(matrix_world)
+
+poses_output = np.array(poses_output)
+np.save('/content/BlenderProc/output_poses.npy', poses_output)
 
 # activate normal and depth rendering
 bproc.renderer.enable_normals_output()
